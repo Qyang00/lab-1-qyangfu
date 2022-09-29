@@ -1,0 +1,65 @@
+---
+title: "PSTAT 131"
+author: "Qingyang Fu"
+date: "2022-09-27"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(ISLR)
+```
+
+
+Q1
+Supervised learning uses linear regression, logistic regression, k-nearest neighbors, decision trees, random forests, support vector machine, and neural networks.
+Unsupervised learning uses principal component analysis, k-means clustering, hierarchical clustering, and neural networks.
+Supervised learning take an actual data Y as supervisor, and unsupervised learning does not has an actual data value for Y. 
+
+
+Q2
+In machine learning, for regression model, Y is quantitative and it predicts numerical values. While for Classification model, Y is qualitative and predicts categorical values.
+
+
+Q3
+
+
+Q4
+Descriptive Models: Choose model to best visually emphasize a trend in data
+Predictive Models: To predict Y with minimum reducible error and is not focused on hypothesis test
+Inferential Models: To test theroeis, possibly causal calims, and state relationship between outcome and predicator(s)
+
+
+Q5
+
+
+Q6
+
+
+Exercise 1:
+```{r}
+
+
+
+```
+
+Exercise 2:
+```{r}
+
+```
+
+Exercise 3:
+```{r}
+
+```
+
+Exercise 4:
+```{r}
+
+```
+
+Exercise 5:
+```{r}
+
+```
