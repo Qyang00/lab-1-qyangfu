@@ -23,6 +23,8 @@ In machine learning, for regression model, Y is quantitative and it predicts num
 
 
 Q3
+Regression: MSE & RMSE
+Classification: Accuracy & Confusion Matrix
 
 
 Q4
@@ -32,21 +34,35 @@ Inferential Models: To test theroeis, possibly causal calims, and state relation
 
 
 Q5
+Mechanistic model is parametric, and it assumes a parametric form for f and won't match true unknown f. It can add parameters to be more flexible, but too many will cause over-fitting.
+Empirically-driven is non-parametric, there will be no assumption about f, and it requires a larger number of observations. This is more flexible by default but can be over-fitting as well. 
+
+I think that mechanistic model should be easier to understand, since it assume a parametric form for f and usually less flexible than empirically- driven model. Thus the model has better interpretability. 
+
+Bias-Variance trade-off is that bias and variance has a negative relationship. Which means fora simple model, it has high bias but low variance, while for a flexible model, it has low bias but high variance.
 
 
 Q6
+Given a voter’s profile/data, how likely is it that they will vote in favor of the candidate?
+  This is predictive model, since a voter's data is given and it is aimed to predict the result with minimum reducible error and is not focused on hypothesis test
+How would a voter’s likelihood of support for the candidate change if they had personal contact with the candidate?
+  This is inferential model, since it is aimed to test theories that if there is a relationship between the voter's support and their personal contact with the candidate.
+
 
 
 Exercise 1:
+We can tell from the diagram that most of the vehicles drive 25 to 30 miles per gallon, while least of the vehicles drive above 35 miles per gallon.
 ```{r}
-
-
-
+data("mpg")
+hist(mpg$hwy, main="Highway Miles per Gallon", breaks=5, xlim = range(10:45), xlab="hwy",ylab= "Frequency")
 ```
 
 Exercise 2:
+There is no obvious outliers, and as the hwy increases, cty increases as well, which show there is a possible positive linear relationship between hwy and cty.
 ```{r}
-
+ggplot(mpg, aes(hwy, cty)) + 
+  geom_point(size=2, alpha=0.4) +
+  labs(x="hwy", y="cty")
 ```
 
 Exercise 3:
@@ -55,11 +71,20 @@ Exercise 3:
 ```
 
 Exercise 4:
+There is outliers exists when cyl = 4 and 8.There seems to be a possible negative linear relationship between hwy and cyl. When the value of cyl increases, the value of hwy decreases.
 ```{r}
-
+boxplot(hwy ~ cyl, data = mpg)
 ```
 
 Exercise 5:
+mpg has a negative correlation with cyl, disp, hp, wt, and carb. And positive relationship with all other variables. The relationships are making sense since there is a clear relationship between mpg and other variables that is there is a positive relationship, the mpg increases as the other variables increase. And if there is a neggative relationship, the mpg decreases as the other variables increases.
 ```{r}
-
+data("mpg")
+install.packages("corrplot")
+library(corrplot)
 ```
+```{r}
+M <- cor(mtcars)
+corrplot(M, method = 'number', type = "lower")
+```
+
