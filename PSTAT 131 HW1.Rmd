@@ -66,8 +66,20 @@ ggplot(mpg, aes(hwy, cty)) +
 ```
 
 Exercise 3:
+lincoln produce the least cars, dodge produces the most cars.
 ```{r}
+data(mpg)
 
+xx <- as.data.frame(table(mpg['manufacturer']))
+colnames(xx) <- c('Manufacturer','Count')
+xx
+
+
+p <- ggplot(data=xx, aes(x = reorder(Manufacturer, -Count), y = Count)) +
+  geom_bar(stat="identity")
+
+
+p + coord_flip()
 ```
 
 Exercise 4:
