@@ -1,0 +1,197 @@
+---
+title: "PSTAT131 HW3"
+author: "Qingyang Fu"
+date: "2022-10-27"
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(ISLR)
+library(ISLR2)
+library(discrim)
+library(poissonreg)
+library(corrr)
+library(klaR)
+library(readr)
+library(yardstick)
+tidymodels_prefer()
+```
+
+```{r}
+Titanic <- read_csv('~/Desktop/titanic.csv') %>%
+  mutate(survived = factor(survived, levels = c("Yes", "No")),
+         pclass = factor(pclass))
+```
+
+Q1
+It is good to stratify sampling for this data because it ensures each subgroup receives proper representation within the sample.
+```{r}
+set.seed(417)
+Titanic_split <- initial_split(Titanic, prop = 0.80, strata = survived)
+Titanic_train <- training(Titanic_split)
+Titanic_test <- testing(Titanic_split)
+
+Titanic_test
+Titanic_train
+```
+
+
+Q2
+The bar plot show that more people did not survived on Titanic comparing to those who survived.The bar graph seems like a binomial disturubtion
+```{r}
+ggplot(Titanic_train, aes(survived))+
+  geom_bar()
+```
+
+
+Q3
+It seems like there is a relatively strong negative correlation between pclass and fare.
+```{r}
+cor_Titanic <- Titanic_train %>%
+  select(-c(survived, name, sex, ticket, cabin, embarked)) %>%
+  correlate()
+rplot(cor_Titanic)
+```
+
+Q4
+```{r}
+Titanic_train_new <- subset(Titanic_train, select = c(pclass, sex, age, sib_sp,
+                                         parch, fare, survived))
+```
+
+```{r}
+simple_titanic_recipe <- recipe(survived ~ ., data = Titanic_train_new) %>%
+  step_impute_linear(age) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_interact(terms = ~ starts_with('sex'):fare +
+                  age: fare) 
+summary(simple_titanic_recipe)
+```
+
+Q5
+```{r}
+log_reg <- logistic_reg() %>% 
+  set_engine("glm") %>% 
+  set_mode("classification")
+
+log_wkflow <- workflow() %>% 
+  add_model(log_reg) %>% 
+  add_recipe(simple_titanic_recipe)
+
+log_fit <- fit(log_wkflow, Titanic_train)
+```
+
+Q6
+```{r}
+lda_mod <- discrim_linear() %>% 
+  set_mode("classification") %>% 
+  set_engine("MASS")
+
+lda_wkflow <- workflow() %>% 
+  add_model(lda_mod) %>% 
+  add_recipe(simple_titanic_recipe)
+
+lda_fit <- fit(lda_wkflow, Titanic_train)
+```
+
+Q7
+```{r}
+qda_mod <- discrim_quad() %>% 
+  set_mode("classification") %>% 
+  set_engine("MASS")
+
+qda_wkflow <- workflow() %>% 
+  add_model(qda_mod) %>% 
+  add_recipe(simple_titanic_recipe)
+
+qda_fit <- fit(qda_wkflow, Titanic_train)
+```
+
+Q8
+```{r}
+nb_mod <- naive_Bayes() %>% 
+  set_mode("classification") %>% 
+  set_engine("klaR") %>% 
+  set_args(usekernel = FALSE) 
+
+nb_wkflow <- workflow() %>% 
+  add_model(nb_mod) %>% 
+  add_recipe(simple_titanic_recipe)
+
+nb_fit <- fit(nb_wkflow, Titanic_train)
+```
+
+Q9
+```{r}
+#log
+log_reg_acc <- predict(log_fit, new_data = Titanic_train, type = 'class') %>%
+  bind_cols(Titanic_train %>% select(survived))%>%
+  accuracy(truth = survived, estimate = .pred_class)
+log_reg_acc
+```
+
+```{r}
+#lda
+lda_acc <- predict(lda_fit, new_data = Titanic_train, type = 'class') %>%
+  bind_cols(Titanic_train %>% select(survived))%>%
+  accuracy(truth = survived, estimate = .pred_class)
+lda_acc
+```
+```{r}
+#QDA
+qda_acc <- predict(qda_fit, new_data = Titanic_train, type = 'class') %>%
+  bind_cols(Titanic_train %>% select(survived))%>%
+  accuracy(truth = survived, estimate = .pred_class)
+qda_acc
+```
+```{r}
+#nb
+nb_acc <- predict(nb_fit, new_data = Titanic_train, type = 'class') %>%
+  bind_cols(Titanic_train %>% select(survived))%>%
+  accuracy(truth = survived, estimate = .pred_class)
+nb_acc
+```
+```{r}
+accuracies <- c(log_reg_acc$.estimate, lda_acc$.estimate, 
+                nb_acc$.estimate, qda_acc$.estimate)
+models <- c("Logistic Regression", "LDA", "Naive Bayes", "QDA")
+results <- tibble(accuracies = accuracies, models = models)
+results %>% 
+  arrange(-accuracies)
+```
+Thus the logistic regression achieves the highest accuracy on the training data.
+
+Q10
+The logistic regression has the highest accuracy so we fit this model to the testing data.
+```{r}
+predict(log_fit, new_data = Titanic_test, type = "prob")
+```
+```{r}
+augment(log_fit, new_data = Titanic_test) %>%
+  conf_mat(truth = survived, estimate = .pred_class)
+```
+```{r}
+multi_metric <- metric_set(accuracy, sensitivity, specificity)
+
+augment(log_fit, new_data = Titanic_test) %>%
+  multi_metric(truth = survived, estimate = .pred_class)
+```
+```{r}
+augment(log_fit, new_data = Titanic_test) %>%
+  conf_mat(truth = survived, estimate = .pred_class) %>% 
+  autoplot(type = "heatmap")
+```
+
+```{r}
+augment(log_fit, new_data = Titanic_test) %>%
+  roc_curve(survived, .pred_Yes) %>%
+  autoplot()
+```
+```{r}
+augment(log_fit, new_data = Titanic_test) %>%
+  roc_auc(survived, .pred_Yes)
+```
+The conclusion is that our model did a good job on prediction, since the estimate is 0.8866 which is close to 1. The value is even higher than the training set which suggests the model fit well.
