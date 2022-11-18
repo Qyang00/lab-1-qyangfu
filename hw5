@@ -1,0 +1,148 @@
+---
+title: "Homework 5"
+author: "Qingyang Fu"
+date: "2022-11-16"
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r}
+#loading package
+library(tidyverse)
+library(glmnet)
+library(tidymodels)
+library(ISLR)
+library(ISLR2)
+library(discrim)
+library(poissonreg)
+library(corrr)
+library(klaR)
+library(readr)
+library(yardstick)
+library(janitor)
+tidymodels_prefer()
+library(ggplot2)
+```
+
+```{r}
+#read in data
+Pokeman <- read_csv('~/Desktop/Pokemon.csv')
+set.seed(417)
+```
+
+###Q1
+Resulting names are unique and consist only of the _ character, numbers, and letters. I think it is useful as it help us to process the data quicker and easier.
+```{r}
+Pokeman_clean <- clean_names(Pokeman)
+```
+
+###Q2
+There are 18 classes of outcome. The type flying has a relatively very low number of Pokeman
+```{r}
+ggplot(Pokeman_clean, aes(type_1))+
+  geom_bar()
+```
+```{r}
+#Filtering and factoring
+Pokeman_new <- dplyr::filter(Pokeman_clean, type_1 %in% c('Bug','Fire','Grass','Normal','Water','Psychic')) %>% 
+  mutate(type_1 = factor(type_1),
+         legendary = factor(legendary),
+         generation = factor(generation)) 
+```
+
+###Q3
+```{r}
+Pokeman_split <- Pokeman_new %>%
+  initial_split(strata = type_1, prop = 0.7)
+Pokeman_train <- training(Pokeman_split)
+Pokeman_test <- testing(Pokeman_split)
+dim(Pokeman_train)
+dim(Pokeman_test)
+```
+```{r}
+#fold
+Pokeman_folds <- vfold_cv(Pokeman_train, v = 5, strata = type_1)
+Pokeman_folds
+```
+Stratfying the folds is important since we need to ensures the folded sets have the same proportion of the feature of interest as in the original dataset.
+
+###Q4
+```{r}
+#recipe
+Pokeman_recipe <- recipe(type_1 ~ legendary + generation + sp_atk + attack
+                         + speed + defense + hp+ sp_def, Pokeman_train) %>%
+  step_center(all_numeric_predictors()) %>%
+  step_dummy(legendary, generation) %>%
+  step_scale(all_numeric_predictors())
+Pokeman_recipe %>%
+  prep() %>%
+  juice()
+```
+
+###Q5
+```{r}
+Pokeman_model <- multinom_reg(penalty = tune(), mixture = tune()) %>%
+  set_engine("glmnet")
+```
+
+```{r}
+Pokeman_workflow <- workflow() %>% 
+  add_recipe(Pokeman_recipe) %>% 
+  add_model(Pokeman_model)
+```
+
+```{r}
+#regular grid
+penalty_grid <- grid_regular(penalty(range = c(-5,5)), mixture(range = c(0,1)), levels = 10)
+penalty_grid
+```
+Total of 50 models will fit to the folded data.
+
+
+###Q6
+
+```{r}
+tune_res <- tune_grid(
+  Pokeman_workflow,
+  resamples = Pokeman_folds, 
+  grid = penalty_grid
+)
+
+tune_res
+```
+```{r}
+autoplot(tune_res)
+```
+smaller value produce better accuracy and roc_auc.
+
+###Q7
+```{r}
+#best value
+best_penalty <- select_best(tune_res, metric = "roc_auc")
+best_penalty
+```
+```{r}
+Pokeman_final <- finalize_workflow(Pokeman_workflow, best_penalty)
+Pokeman_final_fit <- fit(Pokeman_final, data = Pokeman_train)
+augment(Pokeman_final_fit, new_data = Pokeman_test, type = 'prob') %>%
+  roc_auc(truth = type_1, estimate = .pred_Bug:.pred_Water)
+```
+
+###Q8
+```{r}
+overall_fit <- augment(Pokeman_final_fit, Pokeman_test, type = 'prob')
+roc_auc(overall_fit, truth = type_1, estimate = .pred_Bug:.pred_Water)
+```
+```{r}
+#roc curves plot
+roc_curve(overall_fit, truth = type_1, estimate = .pred_Bug:.pred_Water) %>%
+  autoplot()
+```
+```{r}
+#heat map
+conf_mat(overall_fit, truth = type_1, estimate=.pred_class) %>% 
+  autoplot(type='heatmap')
+```
+The prediction model is not bad, but the accuracy depends on different types. Our model predicts best at the type Normal, and worst at Fire. The sample size can be one ofthe reason to cause this cosequence.
+
+
