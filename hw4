@@ -1,0 +1,166 @@
+---
+title: "HW4"
+author: "Qingyang Fu"
+date: "2022-11-03"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r}
+#loading package
+library(tidyverse)
+library(tidymodels)
+library(ISLR)
+library(ISLR2)
+library(discrim)
+library(poissonreg)
+library(corrr)
+library(klaR)
+library(readr)
+library(yardstick)
+tidymodels_prefer()
+```
+
+```{r}
+#read in data
+Titanic <- read_csv('~/Desktop/titanic.csv') %>%
+  mutate(survived = factor(survived, levels = c("Yes", "No")),
+         pclass = factor(pclass))
+```
+
+```{r}
+#seed
+set.seed(417)
+Titanic_split <- initial_split(Titanic, prop = 0.80, strata = survived)
+Titanic_train <- training(Titanic_split)
+Titanic_test <- testing(Titanic_split)
+```
+
+Q1
+
+```{r}
+#split data, stratifying the outcome survived
+Titanic_train_new <- subset(Titanic_train, select = c(pclass, sex, age, sib_sp,
+                                         parch, fare, survived))
+simple_titanic_recipe <- recipe(survived ~ ., data = Titanic_train_new) %>%
+  step_impute_linear(age) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_interact(terms = ~ starts_with('sex'):fare +
+                  age: fare) 
+summary(simple_titanic_recipe)
+```
+
+```{r}
+dim(Titanic_train)
+dim(Titanic_test)
+```
+
+Q2
+
+```{r}
+#k=10
+Titanic_folds <- vfold_cv(Titanic_train, v = 10)
+Titanic_folds
+```
+
+```{r}
+degree_grid <- grid_regular(degree(range = c(1, 10)), levels = 10)
+degree_grid
+```
+
+Q3 k-fold cross-validation randomly divide the data into k groups of equal sizes.Wer use it cause we want to find the best value of degree that yields the "closest" fit, which is hyperparameter tuning. The method generates a result which is easier to understand and less biased. If we use the entire training set, the resampling method would be bootstrap.
+
+Q4 We've got 10 folds and 3 models to fit. Thus across all folds we are going to fit 30 models.
+
+```{r}
+tuned_titanic <- recipe(survived ~ ., data = Titanic_train_new) %>%
+  step_poly(degree = tune())
+
+#log
+log_reg <- logistic_reg() %>% 
+  set_engine("glm") %>% 
+  set_mode("classification")
+
+log_wkflow <- workflow() %>% 
+  add_model(log_reg) %>% 
+  add_recipe(tuned_titanic)
+```
+
+```{r}
+#lda
+lda_mod <- discrim_linear() %>% 
+  set_mode("classification") %>% 
+  set_engine("MASS")
+
+lda_wkflow <- workflow() %>% 
+  add_model(lda_mod) %>% 
+  add_recipe(tuned_titanic)
+```
+
+```{r}
+#qda
+qda_mod <- discrim_quad() %>% 
+  set_mode("classification") %>% 
+  set_engine("MASS")
+
+qda_wkflow <- workflow() %>% 
+  add_model(qda_mod) %>% 
+  add_recipe(tuned_titanic)
+```
+
+Q5
+
+```{r}
+tune_log <- tune_grid(
+  object = log_wkflow, 
+  resamples = Titanic_folds, 
+  grid = degree_grid
+)
+control = control_grid(verbose = TRUE)
+```
+
+
+```{r}
+#lda
+tune_lda <- tune_grid(
+  object = lda_wkflow, 
+  resamples = Titanic_folds, 
+  grid = degree_grid
+)
+control = control_grid(verbose = TRUE)
+```
+
+
+```{r}
+#qda
+tune_qda <- tune_grid(
+  object = qda_wkflow, 
+  resamples = Titanic_folds, 
+  grid = degree_grid
+)
+control = control_grid(verbose = TRUE)
+```
+
+Q6
+
+```{r}
+collect_metrics(tune_log)
+collect_metrics(tune_lda)
+collect_metrics(tune_qda)
+```
+
+Q6
+It seems like the qda model fits the best since it has the lowest standard deviation as well as the highest accuracy mean.
+
+Q7
+```{r}
+final_wf <- finalize_workflow(qda_wkflow, qda_mod)
+
+final_wf
+```
+
+
+Q8
+The testing accuracy is a little bit higher than the average. 
+
